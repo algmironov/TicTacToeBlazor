@@ -1,0 +1,212 @@
+﻿@page "/"
+
+<body class="page-body">
+    <div class="container">
+        <h2 class="label">Крестики-Нолики</h2>
+
+        <div class="game-board">
+            @for (int i = 0; i < 3; i++)
+            {
+                @for (int j = 0; j < 3; j++)
+                {
+                    int row = i;
+                    int col = j;
+                    <button class="cell" @onclick="() => MakeMove(row, col)" disabled="@IsGameOver()" data-content="@board[i, j]">
+                    </button>
+                }
+            }
+        </div>
+
+        <p>@statusMessage</p>
+
+        <button @onclick="RestartGame">Начать заново</button>
+    </div>
+</body>
+
+@code {
+    private char[,] board = new char[3, 3];
+    private bool isPlayerTurn = true;
+    private string statusMessage = "Ваш ход!";
+    private Random random = new Random();
+
+    protected override void OnInitialized()
+    {
+        InitializeBoard();
+    }
+
+    private void InitializeBoard()
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                board[i, j] = ' ';
+            }
+        }
+        isPlayerTurn = true;
+        statusMessage = "Ваш ход!";
+    }
+
+    private void MakeMove(int row, int col)
+    {
+        if (board[row, col] == ' ' && !IsGameOver())
+        {
+            board[row, col] = 'X';
+            if (CheckWinner('X'))
+            {
+                statusMessage = "Вы победили!";
+                return;
+            }
+
+            if (IsBoardFull())
+            {
+                statusMessage = "Ничья!";
+                return;
+            }
+
+            MakeComputerMove();
+        }
+    }
+
+    private void MakeComputerMove()
+    {
+        isPlayerTurn = false;
+        statusMessage = "Ход компьютера...";
+
+        // Проверяем, можем ли мы выиграть следующим ходом
+        var winningMove = FindWinningMove('O');
+        if (winningMove.HasValue)
+        {
+            board[winningMove.Value.Item1, winningMove.Value.Item2] = 'O';
+        }
+        // Проверяем, нужно ли блокировать ход игрока
+        else
+        {
+            var blockingMove = FindWinningMove('X');
+            if (blockingMove.HasValue)
+            {
+                board[blockingMove.Value.Item1, blockingMove.Value.Item2] = 'O';
+            }
+            else
+            {
+                // Если нет выигрышных или блокирующих ходов, выбираем случайную свободную ячейку
+                var emptyCells = GetEmptyCells();
+                if (emptyCells.Count > 0)
+                {
+                    var move = emptyCells[random.Next(emptyCells.Count)];
+                    board[move.Item1, move.Item2] = 'O';
+                }
+            }
+        }
+
+        if (CheckWinner('O'))
+        {
+            statusMessage = "Компьютер победил!";
+            return;
+        }
+
+        if (IsBoardFull())
+        {
+            statusMessage = "Ничья!";
+            return;
+        }
+
+        isPlayerTurn = true;
+        statusMessage = "Ваш ход!";
+    }
+
+    private (int, int)? FindWinningMove(char player)
+    {
+        // Проверяем горизонтали и вертикали
+        for (int i = 0; i < 3; i++)
+        {
+            if (CheckLine(i, 0, i, 1, i, 2, player)) return FindEmptyInLine(i, 0, i, 1, i, 2);
+            if (CheckLine(0, i, 1, i, 2, i, player)) return FindEmptyInLine(0, i, 1, i, 2, i);
+        }
+
+        // Проверяем диагонали
+        if (CheckLine(0, 0, 1, 1, 2, 2, player)) return FindEmptyInLine(0, 0, 1, 1, 2, 2);
+        if (CheckLine(0, 2, 1, 1, 2, 0, player)) return FindEmptyInLine(0, 2, 1, 1, 2, 0);
+
+        return null;
+    }
+
+    private bool CheckLine(int r1, int c1, int r2, int c2, int r3, int c3, char player)
+    {
+        return (board[r1, c1] == player && board[r2, c2] == player && board[r3, c3] == ' ') ||
+               (board[r1, c1] == player && board[r2, c2] == ' ' && board[r3, c3] == player) ||
+               (board[r1, c1] == ' ' && board[r2, c2] == player && board[r3, c3] == player);
+    }
+
+    private (int, int)? FindEmptyInLine(int r1, int c1, int r2, int c2, int r3, int c3)
+    {
+        if (board[r1, c1] == ' ') return (r1, c1);
+        if (board[r2, c2] == ' ') return (r2, c2);
+        if (board[r3, c3] == ' ') return (r3, c3);
+        return null;
+    }
+
+    private List<(int, int)> GetEmptyCells()
+    {
+        var emptyCells = new List<(int, int)>();
+        for (int i = 0; i < 3; i++)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                if (board[i, j] == ' ')
+                {
+                    emptyCells.Add((i, j));
+                }
+            }
+        }
+        return emptyCells;
+    }
+
+    private bool CheckWinner(char player)
+    {
+        // Проверка по горизонтали и вертикали
+        for (int i = 0; i < 3; i++)
+        {
+            if ((board[i, 0] == player && board[i, 1] == player && board[i, 2] == player) ||
+                (board[0, i] == player && board[1, i] == player && board[2, i] == player))
+            {
+                return true;
+            }
+        }
+
+        // Проверка по диагоналям
+        if ((board[0, 0] == player && board[1, 1] == player && board[2, 2] == player) ||
+            (board[0, 2] == player && board[1, 1] == player && board[2, 0] == player))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsBoardFull()
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                if (board[i, j] == ' ')
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private bool IsGameOver()
+    {
+        return CheckWinner('X') || CheckWinner('O') || IsBoardFull();
+    }
+
+    private void RestartGame()
+    {
+        InitializeBoard();
+    }
+}
+
